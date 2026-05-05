@@ -1,0 +1,12 @@
+{
+  "name": "icf-checkin-label-printer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Elvanto DYMO simulator and Brother label printer bridge for ICF check-in labels.",
+  "scripts": {
+    "cert": "./scripts/generate-cert.sh",
+    "install-launchd": "./scripts/install-launchd.sh",
+    "start": "node server.js",
+    "test": "node tests/run-tests.js"
+  }
+}
