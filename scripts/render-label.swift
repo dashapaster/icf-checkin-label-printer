@@ -65,8 +65,6 @@ struct RenderSpec: Decodable {
     let churchName: String?
     let securityCode: String?
     let checkinTime: String?
-    let headerTitle: String?
-    let detailLines: [String]?
     let exampleTemplate: ExampleTemplate?
     let objects: [TextObject]
 }
@@ -153,30 +151,6 @@ func drawFallbackText(_ text: String, in rect: NSRect) {
 }
 
 func drawBadge(name: String, department: String, in rect: NSRect, rotated: Bool) {
-    if (spec.templateMode ?? "") == "icf-kids-child" {
-        drawKidsBadge(
-            name: name,
-            headerTitle: spec.headerTitle ?? "ICF Kids",
-            securityCode: spec.securityCode ?? "",
-            detailLines: spec.detailLines ?? [],
-            in: rect,
-            parentCopy: false
-        )
-        return
-    }
-
-    if (spec.templateMode ?? "") == "icf-kids-parent" {
-        drawKidsBadge(
-            name: name,
-            headerTitle: spec.headerTitle ?? "ICF Kids Parent Copy",
-            securityCode: spec.securityCode ?? "",
-            detailLines: spec.detailLines ?? [],
-            in: rect,
-            parentCopy: true
-        )
-        return
-    }
-
     if (spec.templateMode ?? "") == "icf-checkin-app" {
         drawCheckinAppBadge(name: name, department: department, in: rect, logoPath: spec.logoPath)
         return
@@ -211,27 +185,22 @@ func drawBadge(name: String, department: String, in rect: NSRect, rotated: Bool)
 func drawCheckinAppBadge(name: String, department: String, in rect: NSRect, logoPath: String?) {
     let black = NSColor(calibratedWhite: 0.0, alpha: 1.0)
     let white = NSColor.white
-    let isSquareBadge = abs(rect.width - rect.height) < max(rect.width, rect.height) * 0.12
-    let isShortBadge = rect.width > rect.height * 1.25
 
-    let headerHeight = rect.height * (isSquareBadge ? 0.20 : (isShortBadge ? 0.22 : 0.16))
-    let margin = rect.width * (isSquareBadge ? 0.05 : 0.045)
+    let headerHeight = rect.height * 0.16
+    let margin = rect.width * 0.045
 
     black.setFill()
     NSBezierPath(rect: NSRect(x: rect.minX, y: rect.maxY - headerHeight, width: rect.width, height: headerHeight)).fill()
 
-    let titleFontSize = min(
-        rect.width * (isSquareBadge ? 0.082 : (isShortBadge ? 0.082 : 0.090)),
-        isSquareBadge ? 56 : (isShortBadge ? 50 : 64)
-    )
+    let titleFontSize = min(rect.width * 0.090, 64)
 
     drawTextBlock(
         spec.churchName ?? "ICF TEL AVIV",
         in: NSRect(
-            x: rect.width * (isSquareBadge ? 0.03 : (isShortBadge ? 0.05 : 0.08)),
-            y: rect.maxY - headerHeight + headerHeight * (isSquareBadge ? 0.18 : (isShortBadge ? 0.16 : 0.08)),
-            width: rect.width * (isSquareBadge ? 0.94 : (isShortBadge ? 0.90 : 0.84)),
-            height: headerHeight * (isSquareBadge ? 0.58 : (isShortBadge ? 0.60 : 0.82))
+            x: rect.width * 0.08,
+            y: rect.maxY - headerHeight + headerHeight * 0.08,
+            width: rect.width * 0.84,
+            height: headerHeight * 0.82
         ),
         fontName: "",
         fontSize: titleFontSize,
@@ -240,159 +209,35 @@ func drawCheckinAppBadge(name: String, department: String, in rect: NSRect, logo
         color: white
     )
 
-    let nameY = isSquareBadge
-        ? rect.minY + rect.height * 0.39
-        : (isShortBadge
-            ? rect.minY + rect.height * 0.34
-            : rect.maxY - headerHeight - rect.height * 0.35)
-    let nameHeight = isSquareBadge
-        ? rect.height * 0.26
-        : (isShortBadge ? rect.height * 0.28 : rect.height * 0.24)
     let nameRect = NSRect(
         x: margin,
-        y: nameY,
+        y: rect.maxY - headerHeight - rect.height * 0.35,
         width: rect.width - margin * 2,
-        height: nameHeight
+        height: rect.height * 0.24
     )
     drawTrackedCenteredText(
         name.uppercased(),
         in: nameRect,
-        fontSize: min(
-            rect.width * (isSquareBadge ? 0.24 : (isShortBadge ? 0.30 : 0.20)),
-            isSquareBadge ? 168 : (isShortBadge ? 208 : 148)
-        ),
+        fontSize: min(rect.width * 0.20, 148),
         weight: .bold,
         color: black,
-        tracking: max(
-            rect.width * (isSquareBadge ? 0.0015 : (isShortBadge ? 0.001 : 0.014)),
-            isSquareBadge ? 1 : (isShortBadge ? 0.5 : 10)
-        )
+        tracking: max(rect.width * 0.014, 10)
     )
 
     if !department.isEmpty {
-        let departmentY = isSquareBadge
-            ? rect.minY + rect.height * 0.20
-            : (isShortBadge ? rect.minY + rect.height * 0.15 : nameRect.minY - rect.height * 0.22)
-        let departmentHeight = isSquareBadge
-            ? rect.height * 0.14
-            : (isShortBadge ? rect.height * 0.18 : rect.height * 0.14)
         let groupRect = NSRect(
             x: margin,
-            y: departmentY,
+            y: nameRect.minY - rect.height * 0.22,
             width: rect.width - margin * 2,
-            height: departmentHeight
+            height: rect.height * 0.14
         )
         drawTrackedCenteredText(
             department.uppercased(),
             in: groupRect,
-            fontSize: min(
-                rect.width * (isSquareBadge ? 0.13 : (isShortBadge ? 0.18 : 0.12)),
-                isSquareBadge ? 90 : (isShortBadge ? 125 : 84)
-            ),
+            fontSize: min(rect.width * 0.12, 84),
             weight: .bold,
             color: black,
-            tracking: max(
-                rect.width * (isSquareBadge ? 0.001 : (isShortBadge ? 0.0008 : 0.010)),
-                isSquareBadge ? 0.5 : (isShortBadge ? 0.4 : 6)
-            )
-        )
-    }
-}
-
-func drawKidsBadge(
-    name: String,
-    headerTitle: String,
-    securityCode: String,
-    detailLines: [String],
-    in rect: NSRect,
-    parentCopy: Bool
-) {
-    let black = NSColor.black
-    let white = NSColor.white
-    let margin = rect.width * 0.06
-    let headerHeight = rect.height * 0.20
-    let contentWidth = rect.width - margin * 2
-
-    black.setFill()
-    NSBezierPath(rect: NSRect(x: rect.minX, y: rect.maxY - headerHeight, width: rect.width, height: headerHeight)).fill()
-
-    drawTextBlock(
-        headerTitle,
-        in: NSRect(
-            x: rect.minX + margin,
-            y: rect.maxY - headerHeight + headerHeight * 0.14,
-            width: contentWidth,
-            height: headerHeight * 0.72
-        ),
-        fontName: "",
-        fontSize: min(rect.height * 0.10, 46),
-        weight: .bold,
-        align: .center,
-        color: white
-    )
-
-    let nameRect = NSRect(
-        x: rect.minX + margin,
-        y: rect.minY + rect.height * (parentCopy ? 0.48 : 0.50),
-        width: contentWidth,
-        height: rect.height * 0.20
-    )
-    drawTrackedCenteredText(
-        name.uppercased(),
-        in: nameRect,
-        fontSize: min(rect.height * 0.19, 92),
-        weight: .bold,
-        color: black,
-        tracking: max(rect.width * 0.0025, 1.2)
-    )
-
-    let codeBoxHeight = rect.height * (parentCopy ? 0.12 : 0.13)
-    let showsSecurityCode = !parentCopy && !securityCode.isEmpty
-    let codeBoxRect = NSRect(
-        x: rect.midX - rect.width * 0.18,
-        y: rect.minY + rect.height * (parentCopy ? 0.34 : 0.33),
-        width: rect.width * 0.36,
-        height: codeBoxHeight
-    )
-
-    if showsSecurityCode {
-        let codePath = NSBezierPath(roundedRect: codeBoxRect, xRadius: 8, yRadius: 8)
-        codePath.lineWidth = 3
-        black.setStroke()
-        codePath.stroke()
-
-        drawTextBlock(
-            "#\(securityCode)",
-            in: codeBoxRect.insetBy(dx: 8, dy: 4),
-            fontName: "",
-            fontSize: min(codeBoxHeight * 0.52, 40),
-            weight: .bold,
-            align: .center
-        )
-    }
-
-    let lines = detailLines.filter { !$0.isEmpty }
-    let detailsTop = rect.minY + rect.height * 0.08
-    let detailsBottom = showsSecurityCode ? codeBoxRect.minY - rect.height * 0.03 : rect.minY + rect.height * 0.30
-    let detailsHeight = max(detailsBottom - detailsTop, rect.height * 0.14)
-    let lineHeight = detailsHeight / CGFloat(max(lines.count, 1))
-    let detailWeight: NSFont.Weight = parentCopy ? .medium : .regular
-    let detailFontSize = min(rect.height * (parentCopy ? 0.058 : 0.060), parentCopy ? 28 : 30)
-
-    for (index, line) in lines.enumerated() {
-        let lineRect = NSRect(
-            x: rect.minX + margin,
-            y: detailsTop + lineHeight * CGFloat(lines.count - index - 1),
-            width: contentWidth,
-            height: lineHeight
-        )
-        drawTextBlock(
-            line,
-            in: lineRect,
-            fontName: "",
-            fontSize: detailFontSize,
-            weight: detailWeight,
-            align: .center
+            tracking: max(rect.width * 0.010, 6)
         )
     }
 }
@@ -645,37 +490,17 @@ func drawTrackedCenteredText(
 ) {
     let paragraph = NSMutableParagraphStyle()
     paragraph.alignment = .center
-    paragraph.lineBreakMode = .byWordWrapping
+    paragraph.lineBreakMode = .byClipping
 
-    var currentFontSize = fontSize
-    var attrs: [NSAttributedString.Key: Any] = [:]
-    var measured = NSRect.zero
+    let font = NSFont.systemFont(ofSize: fontSize, weight: weight)
+    let attrs: [NSAttributedString.Key: Any] = [
+        .font: font,
+        .foregroundColor: color,
+        .paragraphStyle: paragraph,
+        .kern: tracking
+    ]
 
-    while currentFontSize > 8 {
-        let font = NSFont.systemFont(ofSize: currentFontSize, weight: weight)
-        attrs = [
-            .font: font,
-            .foregroundColor: color,
-            .paragraphStyle: paragraph,
-            .kern: tracking
-        ]
-        measured = NSString(string: text).boundingRect(
-            with: NSSize(width: rect.width, height: rect.height * 3),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: attrs
-        )
-        if measured.width <= rect.width && measured.height <= rect.height {
-            break
-        }
-        currentFontSize -= 2
-    }
-
-    let drawRect = NSRect(
-        x: rect.minX,
-        y: rect.minY + max((rect.height - measured.height) / 2, 0),
-        width: rect.width,
-        height: min(measured.height, rect.height)
-    )
+    let drawRect = NSRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)
     NSString(string: text).draw(in: drawRect, withAttributes: attrs)
 }
 

@@ -4,9 +4,6 @@ const path = require("path");
 const querystring = require("querystring");
 const { execFileSync } = require("child_process");
 const { URL } = require("url");
-const { loadLabelTemplates } = require("./src/elvanto/labelTemplates");
-const { createPrintJobs } = require("./src/labels/createPrintJobs");
-const { printLabel } = require("./src/printer/printLabel");
 
 const HOST = process.env.DYMO_SIM_HOST || "127.0.0.1";
 const PORT = Number(process.env.DYMO_SIM_PORT || "41951");
@@ -30,26 +27,12 @@ const BROTHER_QUEUE_NAME =
 const BROTHER_IPP_URI =
   process.env.BROTHER_IPP_URI || "ipp://192.168.200.27/ipp/print";
 const BROTHER_MEDIA =
-  process.env.BROTHER_MEDIA || "om_brother-label-62mm_62mm";
+  process.env.BROTHER_MEDIA || "om_brother-label-62x100mm_62x100mm";
 const BROTHER_PRINT_ENABLED =
   String(process.env.BROTHER_PRINT_ENABLED || "true").toLowerCase() !== "false";
-const BROTHER_DIRECT_ENABLED =
-  String(process.env.BROTHER_DIRECT_ENABLED || "true").toLowerCase() !== "false";
-const BROTHER_DIRECT_MODEL =
-  process.env.BROTHER_DIRECT_MODEL || "QL-820NWB";
-const BROTHER_DIRECT_LABEL =
-  process.env.BROTHER_DIRECT_LABEL || "62";
-const BROTHER_DIRECT_IDENTIFIER =
-  process.env.BROTHER_DIRECT_IDENTIFIER || "tcp://192.168.200.27:9100";
-const BROTHER_DIRECT_BACKEND =
-  process.env.BROTHER_DIRECT_BACKEND || "network";
 const SWIFT_RENDERER = path.join(__dirname, "scripts", "render-label.swift");
 const SWIFT_CACHE_DIR = path.join(__dirname, ".swift-cache");
 const SWIFT_RENDERER_BIN = path.join(__dirname, ".swift-cache", "render-label");
-const SWIFT_RENDERER_BUILD_INFO = path.join(__dirname, ".swift-cache", "render-label-build.json");
-const DIRECT_PRINT_HELPER = path.join(__dirname, "scripts", "direct-print", "print_brother.py");
-const DIRECT_PRINT_PYTHON = path.join(__dirname, ".venv-direct", "bin", "python");
-const ARCH_BIN = "/usr/bin/arch";
 const ICF_LOGO_PATH =
   process.env.ICF_LOGO_PATH || "/Users/dashapasternak/Downloads/icf_logo_white.png";
 const EXAMPLE_LBX_PATH =
@@ -133,10 +116,10 @@ const server = https.createServer(
             responseBody = readLabelFile(query.fileName);
             break;
           case "PrintLabel":
-            responseBody = await handlePrintLikeCommand("PrintLabel", form, requestId);
+            responseBody = handlePrintLikeCommand("PrintLabel", form, requestId);
             break;
           case "PrintLabel2":
-            responseBody = await handlePrintLabel2(form, requestId);
+            responseBody = handlePrintLabel2(form, requestId);
             break;
           case "GetJobStatus":
             responseBody = handleGetJobStatus(query);
@@ -188,15 +171,15 @@ server.listen(PORT, HOST, () => {
   console.log(`Extracted payloads: ${PAYLOADS_DIR}`);
 });
 
-async function handlePrintLikeCommand(command, form, requestId) {
+function handlePrintLikeCommand(command, form, requestId) {
+  maybePrintOnBrother(command, requestId, form);
   persistPayloadArtifacts(command, requestId, form);
-  await maybePrintOnBrother(command, requestId, form);
   return "";
 }
 
-async function handlePrintLabel2(form, requestId) {
+function handlePrintLabel2(form, requestId) {
+  maybePrintOnBrother("PrintLabel2", requestId, form);
   persistPayloadArtifacts("PrintLabel2", requestId, form);
-  await maybePrintOnBrother("PrintLabel2", requestId, form);
   const jobId = String(jobCounter++);
   jobs.set(jobId, {
     status: 2,
@@ -305,49 +288,48 @@ function persistPayloadArtifacts(command, requestId, form) {
   }
 }
 
-async function maybePrintOnBrother(command, requestId, form) {
+function maybePrintOnBrother(command, requestId, form) {
   if (!BROTHER_PRINT_ENABLED) {
     return;
   }
 
   try {
-    const templateBundle = await loadLabelTemplates({
-      apiKey: process.env.ELVANTO_SECRET_API_KEY,
-      logger: console,
-    });
-    const jobsToPrint = createPrintJobs({
-      form,
-      requestId,
-      templates: templateBundle.templates,
-      defaultPrinterName: DEFAULT_PRINTER_NAME,
-      brotherExampleTemplate,
-      logoPath: fs.existsSync(ICF_LOGO_PATH) ? ICF_LOGO_PATH : "",
-      timezone: process.env.TZ || "Asia/Jerusalem",
+    ensureBrotherQueue();
+    ensureRendererBinary();
+    const spec = buildRenderSpec(form, requestId);
+    const specPath = path.join(RENDERED_DIR, `${requestId}-${command}.json`);
+    const pngPath = path.join(RENDERED_DIR, `${requestId}-${command}.png`);
+
+    fs.writeFileSync(specPath, JSON.stringify(spec));
+    execFileSync(SWIFT_RENDERER_BIN, [specPath, pngPath], {
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        CLANG_MODULE_CACHE_PATH: SWIFT_CACHE_DIR,
+      },
     });
 
-    printLabel({
-      requestId,
-      command,
-      jobs: jobsToPrint,
-      renderedDir: RENDERED_DIR,
-      swiftRendererBin: SWIFT_RENDERER_BIN,
-      swiftCacheDir: SWIFT_CACHE_DIR,
-      directPrintPython: DIRECT_PRINT_PYTHON,
-      directPrintHelper: DIRECT_PRINT_HELPER,
-      archBin: ARCH_BIN,
-      brotherConfig: {
-        enabled: BROTHER_PRINT_ENABLED,
-        directEnabled: BROTHER_DIRECT_ENABLED,
-        directModel: BROTHER_DIRECT_MODEL,
-        directLabel: BROTHER_DIRECT_LABEL,
-        directIdentifier: BROTHER_DIRECT_IDENTIFIER,
-        directBackend: BROTHER_DIRECT_BACKEND,
-        queueName: BROTHER_QUEUE_NAME,
-        media: BROTHER_MEDIA,
-      },
-      ensureBrotherQueue,
-      ensureRendererBinary,
-    });
+    execFileSync(
+      "/usr/bin/lp",
+      [
+        "-d",
+        BROTHER_QUEUE_NAME,
+        "-o",
+        "PageSize=62x100mm",
+        "-o",
+        "CutMedia=Auto",
+        "-o",
+        `media=${BROTHER_MEDIA}`,
+        "-o",
+        "print-color-mode=monochrome",
+        "-o",
+        spec.orientation === "landscape"
+          ? "orientation-requested=4"
+          : "orientation-requested=3",
+        pngPath,
+      ],
+      { stdio: "pipe" }
+    );
   } catch (error) {
     const message = error && error.stderr ? error.stderr.toString("utf8") : String(error.message || error);
     fs.writeFileSync(
@@ -376,21 +358,16 @@ function ensureBrotherQueue() {
 }
 
 function ensureRendererBinary() {
+  if (rendererBinaryVerified && fs.existsSync(SWIFT_RENDERER_BIN)) {
+    return;
+  }
+
   const sourceStat = fs.statSync(SWIFT_RENDERER);
-  const buildInfo = readRendererBuildInfo();
   const binaryExists = fs.existsSync(SWIFT_RENDERER_BIN);
-  const buildInfoMatches =
-    buildInfo &&
-    buildInfo.projectDir === __dirname &&
-    buildInfo.sourceMtimeMs === sourceStat.mtimeMs;
   const binaryIsFresh =
-    binaryExists &&
-    fs.statSync(SWIFT_RENDERER_BIN).mtimeMs >= sourceStat.mtimeMs &&
-    buildInfoMatches;
+    binaryExists && fs.statSync(SWIFT_RENDERER_BIN).mtimeMs >= sourceStat.mtimeMs;
 
   if (!binaryIsFresh) {
-    fs.rmSync(SWIFT_CACHE_DIR, { recursive: true, force: true });
-    ensureDir(SWIFT_CACHE_DIR);
     execFileSync(
       "xcrun",
       ["swiftc", "-O", SWIFT_RENDERER, "-o", SWIFT_RENDERER_BIN],
@@ -402,31 +379,9 @@ function ensureRendererBinary() {
         },
       }
     );
-    fs.writeFileSync(
-      SWIFT_RENDERER_BUILD_INFO,
-      JSON.stringify(
-        {
-          projectDir: __dirname,
-          sourceMtimeMs: sourceStat.mtimeMs,
-        },
-        null,
-        2
-      )
-    );
   }
 
   rendererBinaryVerified = true;
-}
-
-function readRendererBuildInfo() {
-  try {
-    if (!fs.existsSync(SWIFT_RENDERER_BUILD_INFO)) {
-      return null;
-    }
-    return JSON.parse(fs.readFileSync(SWIFT_RENDERER_BUILD_INFO, "utf8"));
-  } catch (error) {
-    return null;
-  }
 }
 
 function buildRenderSpec(form, requestId) {
@@ -436,11 +391,11 @@ function buildRenderSpec(form, requestId) {
   const orientation = determineOrientation(labelXml);
   const brotherLayout = desktopLabelName
     ? {
-        width: 696,
-        height: 505,
+        width: 1109,
+        height: 696,
         orientation: "landscape",
-        sourceWidth: 6200,
-        sourceHeight: 4500,
+        sourceWidth: 10000,
+        sourceHeight: 6200,
       }
     : {
         width: orientation === "landscape" ? 1063 : 343,
