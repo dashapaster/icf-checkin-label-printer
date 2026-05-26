@@ -15,7 +15,7 @@ const FALLBACK_TEMPLATES = {
   parent: {
     labelName: "Children Only Parent Label",
     template:
-      "[b][fullname][/b] [size=16]#[security_code][/size]\nPray and Play 17:30 pick up\n\n2nd service 19:15 pick up\n[checkin_room]\n[checkin_service_date][checkin_service_time]",
+      "[b][fullname][/b] [size=16]#[security_code][/size]\nPray and Play 17:30 pick up\n\n2nd service 19:15 pick up\n[checkin_room]\n[checkin_service_date]",
   },
 };
 

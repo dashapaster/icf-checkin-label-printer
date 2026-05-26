@@ -5,6 +5,9 @@
   "description": "Elvanto DYMO simulator and Brother label printer bridge for ICF check-in labels.",
   "scripts": {
     "cert": "./scripts/generate-cert.sh",
+    "trust-cert": "./scripts/trust-cert.sh",
+    "trust-system-cert": "./scripts/trust-system-cert.command",
+    "setup": "./scripts/setup-mac.sh",
     "install-launchd": "./scripts/install-launchd.sh",
     "start": "node server.js",
     "test": "node tests/run-tests.js"

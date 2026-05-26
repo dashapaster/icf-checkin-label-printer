@@ -32,6 +32,21 @@ async function main() {
     assert.strictEqual(type, LABEL_TYPES.CHILD);
   }, results);
 
+  await test("child detection works from resolved Elvanto content with separate security line", () => {
+    const labelXml = createDesktopLabel([
+      "Adam Goldshtein",
+      "#568",
+      "3 years 053-402-2626",
+      "ICF Play and Pray",
+      "8 May",
+    ]);
+    const type = detectLabelType({
+      labelXml,
+      templates: FALLBACK_TEMPLATES,
+    });
+    assert.strictEqual(type, LABEL_TYPES.CHILD);
+  }, results);
+
   await test("parent detection works from pickup content", () => {
     const labelXml = createDesktopLabel([
       "Adam Goldshtein",
@@ -90,6 +105,65 @@ async function main() {
     assert.strictEqual(jobs.length, 2);
     assert.strictEqual(jobs[0].spec.templateMode, "icf-kids-child");
     assert.strictEqual(jobs[1].spec.templateMode, "icf-kids-parent");
+    assert.deepStrictEqual(jobs[0].spec.detailLines, [
+      "[age] years [mobile]",
+      "[checkin_room]",
+      "[checkin_service_date]",
+    ]);
+    assert.ok(!jobs[1].spec.detailLines.join("\n").includes("[checkin_service_time]"));
+  }, results);
+
+  await test("resolved child label creates child and parent print jobs and skips duplicate explicit parent", () => {
+    const childLabelXml = createDesktopLabel([
+      "Adam Goldshtein",
+      "#568",
+      "3 years 053-402-2626",
+      "ICF Play and Pray",
+      "8 May",
+    ]);
+    const childJobs = createPrintJobs({
+      form: {
+        printerName: "DYMO LabelWriter 450",
+        labelXml: childLabelXml,
+        labelSetXml: "",
+      },
+      requestId: "2026-04-30T10-00-00-000Z-0002",
+      templates: FALLBACK_TEMPLATES,
+      defaultPrinterName: "DYMO LabelWriter 450",
+      brotherExampleTemplate: { logoPath: "", template: null },
+      logoPath: "",
+      timezone: "Asia/Jerusalem",
+    });
+
+    assert.strictEqual(childJobs.length, 2);
+    assert.deepStrictEqual(childJobs[0].spec.detailLines, [
+      "3 years 053-402-2626",
+      "ICF Play and Pray",
+      "8 May",
+    ]);
+
+    const explicitParentXml = createDesktopLabel([
+      "Adam Goldshtein",
+      "#568",
+      "Pray and Play 17:30 забрать",
+      "2 service 19:15 забрать",
+      "8 May15:30",
+    ]);
+    const parentJobs = createPrintJobs({
+      form: {
+        printerName: "DYMO LabelWriter 450",
+        labelXml: explicitParentXml,
+        labelSetXml: "",
+      },
+      requestId: "2026-04-30T10-00-00-000Z-0003",
+      templates: FALLBACK_TEMPLATES,
+      defaultPrinterName: "DYMO LabelWriter 450",
+      brotherExampleTemplate: { logoPath: "", template: null },
+      logoPath: "",
+      timezone: "Asia/Jerusalem",
+    });
+
+    assert.strictEqual(parentJobs.length, 0);
   }, results);
 
   await test("parent label hides copy text, security code, and service time", () => {
@@ -108,10 +182,9 @@ async function main() {
 
     assert.strictEqual(rendered.spec.headerTitle, "ICF Kids Parent");
     assert.strictEqual(rendered.spec.securityCode, "");
+    assert.strictEqual(rendered.spec.focusName, "Adam Goldshtein");
     assert.deepStrictEqual(rendered.spec.detailLines, [
-      "Pray and Play 17:30 pick up",
-      "2nd service 19:15 pick up",
-      "ICF Kids",
+      "19:15 - Забрать детей",
       "1 May, 2026",
     ]);
   }, results);

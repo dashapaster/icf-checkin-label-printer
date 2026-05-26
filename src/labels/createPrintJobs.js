@@ -2,7 +2,11 @@ const { AppError } = require("../errors/AppError");
 const { detectLabelType } = require("./detectLabelType");
 const { renderVolunteerLabel } = require("./renderVolunteerLabel");
 const { renderChildLabel } = require("./renderChildLabel");
-const { renderParentLabel } = require("./renderParentLabel");
+const {
+  buildParentDetailLines,
+  renderParentLabel,
+  stripSecurityCodeFromName,
+} = require("./renderParentLabel");
 const { LABEL_TYPES } = require("./types");
 const {
   ensureLabelXml,
@@ -126,11 +130,8 @@ function cleanupSyntheticParents() {
 function buildParentFingerprint(parentData) {
   return normalizeWhitespace(
     [
-      parentData.name,
-      parentData.securityCode,
-      ...(parentData.pickupLines || []),
-      parentData.room,
-      parentData.dateAndTime,
+      stripSecurityCodeFromName(parentData.name),
+      ...buildParentDetailLines(parentData),
     ]
       .filter(Boolean)
       .join("|")

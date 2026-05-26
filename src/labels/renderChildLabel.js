@@ -1,7 +1,7 @@
 function renderChildLabel({ data, form, defaultPrinterName, size }) {
   const layout = size || { width: 696, height: 505, orientation: "landscape" };
   const detailLines = [
-    compact([data.age, data.mobile], "  "),
+    compact([formatAge(data.age), data.mobile], "  "),
     data.room,
     data.date,
   ].filter(Boolean);
@@ -29,7 +29,12 @@ function renderChildLabel({ data, form, defaultPrinterName, size }) {
 }
 
 function compact(parts, separator) {
-  return parts.filter(Boolean).join(separator);
+  return parts.filter(Boolean).join(separator).replace(/\s+/g, " ").trim();
+}
+
+function formatAge(age) {
+  const normalized = String(age || "").trim();
+  return normalized ? `${normalized} years` : "";
 }
 
 module.exports = {

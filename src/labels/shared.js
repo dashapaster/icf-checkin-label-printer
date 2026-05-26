@@ -189,9 +189,8 @@ function splitTemplateLines(template, data) {
 function extractChildLabelData(lines) {
   const safeLines = [...lines];
   const firstLine = safeLines[0] || "";
-  const ageLine = safeLines[1] || "";
-  const roomLine = safeLines[2] || "";
-  const dateLine = safeLines[3] || "";
+  let securityLine = "";
+  let ageLineIndex = 1;
 
   let name = firstLine;
   let securityCode = "";
@@ -199,7 +198,15 @@ function extractChildLabelData(lines) {
   if (firstMatch) {
     name = normalizeWhitespace(firstMatch[1]);
     securityCode = normalizeWhitespace(firstMatch[2]);
+  } else if (/^#/.test(safeLines[1] || "")) {
+    securityLine = safeLines[1];
+    securityCode = normalizeWhitespace(securityLine.replace(/^#/, ""));
+    ageLineIndex = 2;
   }
+
+  const ageLine = safeLines[ageLineIndex] || "";
+  const roomLine = safeLines[ageLineIndex + 1] || "";
+  const dateLine = safeLines[ageLineIndex + 2] || "";
 
   let age = "";
   let mobile = "";
@@ -232,10 +239,16 @@ function extractParentLabelData(lines) {
   const trailing = normalized.filter(
     (line) => line !== name && line !== securityLine && !pickupLines.includes(line)
   );
-  const room = trailing[0] || "";
-  const dateAndTime = trailing[1] || "";
+  let room = trailing[0] || "";
+  let dateAndTime = trailing[1] || "";
+  if (!dateAndTime && looksLikeDateOrTime(room)) {
+    dateAndTime = room;
+    room = "";
+  }
   const dateOnly = normalizeWhitespace(
-    String(dateAndTime).replace(/\b\d{1,2}:\d{2}\b/g, "").replace(/\s+,/g, ",")
+    String(dateAndTime)
+      .replace(/\s*\d{1,2}:\d{2}\b/g, "")
+      .replace(/\s+,/g, ",")
   );
 
   return {
@@ -246,6 +259,15 @@ function extractParentLabelData(lines) {
     dateAndTime,
     dateOnly,
   };
+}
+
+function looksLikeDateOrTime(value) {
+  const normalized = normalizeWhitespace(value).toLowerCase();
+  return (
+    /\b\d{1,2}:\d{2}\b/.test(normalized) ||
+    /\b\d{1,2}\s+[a-z]{3,}\b/.test(normalized) ||
+    /\b\d{1,2}\s+[a-z]{3,}\d{1,2}:\d{2}\b/.test(normalized)
+  );
 }
 
 function ensureLabelXml(labelXml) {

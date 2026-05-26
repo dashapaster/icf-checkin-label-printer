@@ -73,6 +73,15 @@ function detectLabelType({
   }
 
   if (
+    lines.length >= 5 &&
+    /^#\w+/i.test(lines[1] || "") &&
+    /\byears?\b/i.test(lines[2] || "") &&
+    /\d{2,}/.test(lines[2] || "")
+  ) {
+    return LABEL_TYPES.CHILD;
+  }
+
+  if (
     (rawText.includes("security_code") && rawText.includes("pick up")) ||
     labelText.includes("pick up") ||
     rawText.includes("pickup") ||

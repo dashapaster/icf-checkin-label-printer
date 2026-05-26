@@ -1,5 +1,9 @@
 # ICF Check-in Label Printer
 
+Detailed Russian user instructions:
+
+- [USER_GUIDE_RU.md](/Users/dashapasternak/Documents/icf-checkin-label-printer/USER_GUIDE_RU.md)
+
 Local Node.js service that:
 
 - simulates the DYMO Connect local web service Elvanto expects
@@ -70,10 +74,23 @@ Notes:
 
 ## Start
 
-Generate the local HTTPS certificate once:
+Run first-time setup once on each Mac. For the most reliable Chrome/Elvanto behavior, use the System keychain setup. It creates a local HTTPS certificate and asks for the Mac password once so Chrome does not show the privacy warning:
+
+```bash
+npm run trust-system-cert
+```
+
+Alternative for only the current user:
+
+```bash
+npm run setup
+```
+
+To regenerate only the certificate later:
 
 ```bash
 npm run cert
+npm run trust-cert
 ```
 
 Then start the service:
@@ -89,10 +106,6 @@ The DYMO-compatible endpoints are exposed at:
 - `https://127.0.0.1:41951/DYMO/DLS/Printing/OpenLabelFile`
 - `https://127.0.0.1:41951/DYMO/DLS/Printing/PrintLabel`
 - `https://127.0.0.1:41951/DYMO/DLS/Printing/PrintLabel2`
-
-If Chrome blocks the local HTTPS connection, trust:
-
-- [localhost-cert.pem](/Users/dashapasternak/Documents/New%20project/certs/localhost-cert.pem)
 
 To install the background launchd service:
 

@@ -61,6 +61,7 @@ let jobCounter = 1000;
 const jobs = new Map();
 let brotherQueueVerified = false;
 let rendererBinaryVerified = false;
+let printQueue = Promise.resolve();
 const brotherExampleTemplate = loadBrotherExampleTemplate();
 
 ensureDir(REQUESTS_DIR);
@@ -186,6 +187,13 @@ server.listen(PORT, HOST, () => {
   console.log(`Printer name: ${DEFAULT_PRINTER_NAME}`);
   console.log(`Request logs: ${REQUESTS_DIR}`);
   console.log(`Extracted payloads: ${PAYLOADS_DIR}`);
+  setImmediate(() => {
+    try {
+      ensureRendererBinary();
+    } catch (error) {
+      console.warn(`Renderer prewarm failed: ${String(error.message || error)}`);
+    }
+  });
 });
 
 async function handlePrintLikeCommand(command, form, requestId) {
@@ -325,28 +333,10 @@ async function maybePrintOnBrother(command, requestId, form) {
       timezone: process.env.TZ || "Asia/Jerusalem",
     });
 
-    printLabel({
+    enqueueBrotherPrint({
       requestId,
       command,
       jobs: jobsToPrint,
-      renderedDir: RENDERED_DIR,
-      swiftRendererBin: SWIFT_RENDERER_BIN,
-      swiftCacheDir: SWIFT_CACHE_DIR,
-      directPrintPython: DIRECT_PRINT_PYTHON,
-      directPrintHelper: DIRECT_PRINT_HELPER,
-      archBin: ARCH_BIN,
-      brotherConfig: {
-        enabled: BROTHER_PRINT_ENABLED,
-        directEnabled: BROTHER_DIRECT_ENABLED,
-        directModel: BROTHER_DIRECT_MODEL,
-        directLabel: BROTHER_DIRECT_LABEL,
-        directIdentifier: BROTHER_DIRECT_IDENTIFIER,
-        directBackend: BROTHER_DIRECT_BACKEND,
-        queueName: BROTHER_QUEUE_NAME,
-        media: BROTHER_MEDIA,
-      },
-      ensureBrotherQueue,
-      ensureRendererBinary,
     });
   } catch (error) {
     const message = error && error.stderr ? error.stderr.toString("utf8") : String(error.message || error);
@@ -357,6 +347,45 @@ async function maybePrintOnBrother(command, requestId, form) {
     );
     console.error(`Brother print failed for ${requestId}: ${message}`);
   }
+}
+
+function enqueueBrotherPrint({ requestId, command, jobs }) {
+  printQueue = printQueue
+    .then(() =>
+      printLabel({
+        requestId,
+        command,
+        jobs,
+        renderedDir: RENDERED_DIR,
+        swiftRendererBin: SWIFT_RENDERER_BIN,
+        swiftCacheDir: SWIFT_CACHE_DIR,
+        directPrintPython: DIRECT_PRINT_PYTHON,
+        directPrintHelper: DIRECT_PRINT_HELPER,
+        archBin: ARCH_BIN,
+        brotherConfig: {
+          enabled: BROTHER_PRINT_ENABLED,
+          directEnabled: BROTHER_DIRECT_ENABLED,
+          directModel: BROTHER_DIRECT_MODEL,
+          directLabel: BROTHER_DIRECT_LABEL,
+          directIdentifier: BROTHER_DIRECT_IDENTIFIER,
+          directBackend: BROTHER_DIRECT_BACKEND,
+          queueName: BROTHER_QUEUE_NAME,
+          media: BROTHER_MEDIA,
+        },
+        ensureBrotherQueue,
+        ensureRendererBinary,
+      })
+    )
+    .catch((error) => {
+      const message =
+        error && error.stderr ? error.stderr.toString("utf8") : String(error.message || error);
+      fs.writeFileSync(
+        path.join(RENDERED_DIR, `${requestId}-${command}-print-error.txt`),
+        message,
+        "utf8"
+      );
+      console.error(`Brother print failed for ${requestId}: ${message}`);
+    });
 }
 
 function ensureBrotherQueue() {
@@ -781,6 +810,14 @@ function ensureDir(dirPath) {
 }
 
 function readBody(req) {
+  const hasRequestBody =
+    req.headers["content-length"] ||
+    String(req.headers["transfer-encoding"] || "").toLowerCase().includes("chunked");
+
+  if (!hasRequestBody) {
+    return Promise.resolve("");
+  }
+
   return new Promise((resolve, reject) => {
     const chunks = [];
 

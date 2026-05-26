@@ -6,8 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLIST_DIR="$HOME/Library/LaunchAgents"
 PLIST_PATH="$PLIST_DIR/com.local.icf-checkin-label-printer.plist"
-NODE_PATH="$(command -v node)"
 LOG_DIR="$PROJECT_DIR/logs/launchd"
+LAUNCHER_PATH="$PROJECT_DIR/scripts/start-launchd.sh"
 
 mkdir -p "$PLIST_DIR"
 mkdir -p "$LOG_DIR"
@@ -21,8 +21,8 @@ cat > "$PLIST_PATH" <<EOF
     <string>com.local.icf-checkin-label-printer</string>
     <key>ProgramArguments</key>
     <array>
-      <string>$NODE_PATH</string>
-      <string>$PROJECT_DIR/server.js</string>
+      <string>/bin/zsh</string>
+      <string>$LAUNCHER_PATH</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
